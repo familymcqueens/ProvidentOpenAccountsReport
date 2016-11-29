@@ -3,6 +3,7 @@
 use Time::Piece;
 use Math::Round;
 use IO::Handle;
+use Cwd;
 
 my $timestart;
 my $timeend;
@@ -61,6 +62,7 @@ if (open(AM_INSURANCE_FILE,$ARGV[1]) == 0) {
 }
 
 my $ROOT_DIR = $ARGV[2];
+my $CWD = getcwd;
 
 my $overviewFilename = sprintf("%s\\OpenAcctOverview_%s.html",$myTodayFormat,$myTodayFormat);
 my $filename = sprintf(">%s",$overviewFilename);
@@ -1116,9 +1118,9 @@ sub WriteHtmlTopPage
 	print $fileHandle "</style>\n";
 	print $fileHandle "<h2><i>",$reportName,"</i></h2>\n";
 	print $fileHandle "<table><tr>";
-	print $fileHandle "<th colspan=10><font size=3><a href=",$ROOT_DIR,"\\",$overviewFilename,">Accounts Overview</a></th></font>\n";
-	print $fileHandle "<th colspan=10><font size=3><a href=",$ROOT_DIR,"\\",$lateWeightedFilename,">Late Accounts</a></th></font>\n";
-	print $fileHandle "<th colspan=10><font size=3><a href=",$ROOT_DIR,"\\",$scoreFilename,">Account Scores</a></th></font>\n";
+	print $fileHandle "<th colspan=10><font size=3><a href=",$CWD,"\\",$ROOT_DIR,"\\",$overviewFilename,">Accounts Overview</a></th></font>\n";
+	print $fileHandle "<th colspan=10><font size=3><a href=",$CWD,"\\",$ROOT_DIR,"\\",$lateWeightedFilename,">Late Accounts</a></th></font>\n";
+	print $fileHandle "<th colspan=10><font size=3><a href=",$CWD,"\\",$ROOT_DIR,"\\",$scoreFilename,">Account Scores</a></th></font>\n";
 	print $fileHandle "</tr></table>";	
 	print $fileHandle "<br>";
 	print $fileHandle "<table id=\"t02\"><tr><th colspan=7>",$reportType,"</th><th>",$myToday,"</th><th></th></tr></table>";
