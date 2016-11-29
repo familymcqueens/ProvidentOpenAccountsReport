@@ -933,7 +933,7 @@ for my $i (reverse 0 .. $#FoF)
 	my $workphone     = $FoF[$i][ACCT_WORK_PHONE_INDEX];
 	my $cellphone     = $FoF[$i][ACCT_CELL_PHONE_INDEX];
 	my $payoff        = $FoF[$i][ACCT_PAYOFF_INDEX];
-	my $state        = $EoE[$i][ACCT_REPO_INDEX];
+	my $state         = $FoF[$i][ACCT_REPO_INDEX];
 	
 	if ( $FoF[$i][ACCT_INSEXPIRE_DELTA_INDEX] >= $INSEXP_SKIP )
 	{
