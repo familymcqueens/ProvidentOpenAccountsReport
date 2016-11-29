@@ -18,6 +18,7 @@ my $timeend;
  
  my $REPOSSESSED = "Reposessed";
  my $INPROCESSOFREPO = "In Process of Repo";
+ my $ONHOLD = "Hold";
  my $INS_SCORE_WEIGHT = 5.5;
  my $LAST_PAYMENT_WEIGHT = 5;
  my $DAYS_LATE_WEIGHT = .25;
@@ -106,6 +107,7 @@ if (open(HTML_OUTPUT_FILE_DAYSLATE,$filename) == 0) {
 my $totalNumOpenAccounts = 0;
 my $numAcctsRepossessed = 0;
 my $myOpenAccountIndex = 0;
+my $numAccountsSkipped = 0;
 my $myFoundMatchingInsVin = 0;	
 my $myMaxScoreIndex = 0;
 my $myMaxDaysLate = 0;	
@@ -193,7 +195,7 @@ while (<NEW_AM_INPUT_FILE>)
 	chomp;
 	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone) = split(",");
 	
-	if (($repostatus eq $REPOSSESSED) || ($repostatus eq $INPROCESSOFREPO))
+	if (($repostatus eq $REPOSSESSED) || ($repostatus eq $INPROCESSOFREPO) || ($repostatus eq $ONHOLD))
 	{	
 		$numAcctsRepossessed++;		
 	}
@@ -696,6 +698,7 @@ print "SIZE OF FoF (Sorted by Days Late Combination): ",$#FoF,"\n";
 ################################
 
 $myOpenAccountIndex = 1;
+$numAccountsSkipped = 0;
 print $myScoreOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Score</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Payoff</th><th>Insurance Expiration</th></tr>\n";
 
 for my $i (reverse 0 .. $#BoB)
@@ -710,13 +713,15 @@ for my $i (reverse 0 .. $#BoB)
 	my $score        	= $BoB[$i][ACCT_SCORE_INDEX];
 	my $saleDateDelta   = $BoB[$i][ACCT_SALE_DATE_DELTA_INDEX];
 	my $payoff          = $BoB[$i][ACCT_PAYOFF_INDEX];
+	my $state           = $BoB[$i][ACCT_REPO_INDEX];
 	
 	if ( $BoB[$i][ACCT_INSEXPIRE_DELTA_INDEX] >= $INSEXP_SKIP )
 	{
+		$numAccountsSkipped++;
 		next;
 	}
 		
-	if (($BoB[$i][ACCT_REPO_INDEX] ne $REPOSSESSED) && ($BoB[$i][ACCT_REPO_INDEX] ne $INPROCESSOFREPO))
+	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) )
 	{
 		my $myStyle;
 		
@@ -747,7 +752,9 @@ for my $i (reverse 0 .. $#BoB)
 		next;
 	}	
 }
+
 print $myScoreOutput "</table>\n";
+print $myScoreOutput "<br><br><b>Number of Accounts Skipped (Due to Insurance Expiration Dates) = </b>",$numAccountsSkipped,"<br><br>\n";
 print $myScoreOutput "<br><br>\n";
 print $myScoreOutput "</body></html>\n";
 
@@ -771,8 +778,9 @@ for my $i (0 .. $#CoC)
 	my $insExpire    = $CoC[$i][ACCT_INSEXPIRE_INDEX];
 	my $insDelta     = $CoC[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
 	my $score        = $CoC[$i][ACCT_SCORE_INDEX];
+	my $state        = $CoC[$i][ACCT_REPO_INDEX];
 	
-	if (($CoC[$i][ACCT_REPO_INDEX] ne $REPOSSESSED) && ($CoC[$i][ACCT_REPO_INDEX] ne $INPROCESSOFREPO) && ($daysLate > 0))
+	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($daysLate > 0))
 	{
 		print $myLastPayOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$score,"</td><td>",$daysLate,"</td><td>";
 		
@@ -817,9 +825,10 @@ for my $i (0 .. $#DoD)
 	my $custname     = $DoD[$i][ACCT_NAME_INDEX];
 	my $insExpire    = $DoD[$i][ACCT_INSEXPIRE_INDEX];
 	my $insDelta     = $DoD[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
-	my $score        = $DoD[$i][ACCT_SCORE_INDEX];
+	my $score        = $DoD[$i][ACCT_SCORE_INDEX];	
+	my $state        = $DoD[$i][ACCT_REPO_INDEX];
 	
-	if (($DoD[$i][ACCT_REPO_INDEX] ne $REPOSSESSED) && ($DoD[$i][ACCT_REPO_INDEX] ne $INPROCESSOFREPO) && ($insDelta > 0) )
+	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($insDelta > 0))
 	{
 		print $myInsOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$score,"</td><td>",$daysLate,"</td><td>";
 		
@@ -867,8 +876,9 @@ for my $i (0 .. $#EoE)
 	my $insExpire    = $EoE[$i][ACCT_INSEXPIRE_INDEX];
 	my $insDelta     = $EoE[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
 	my $score        = $EoE[$i][ACCT_SCORE_INDEX];
+	my $state        = $EoE[$i][ACCT_REPO_INDEX];
 	
-	if (($EoE[$i][ACCT_REPO_INDEX] ne $REPOSSESSED) && ($EoE[$i][ACCT_REPO_INDEX] ne $INPROCESSOFREPO) && ($daysLate > 0) )
+	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($daysLate > 0))
 	{
 		print $myDaysLateOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$score,"</td><td>",$daysLate,"</td><td>";
 		
@@ -904,6 +914,7 @@ print $myDaysLateOutput "</body></html>\n";
 ################################
 
 $myOpenAccountIndex = 1;
+$numAccountsSkipped = 0;
 print $myLateComboOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Days Active</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Exp.</th><th>Payoff</th><th>Cell Phone</th><th>Home Phone</th><th>Work Phone</th></tr>\n";
 	
 for my $i (reverse 0 .. $#FoF)
@@ -922,14 +933,15 @@ for my $i (reverse 0 .. $#FoF)
 	my $workphone     = $FoF[$i][ACCT_WORK_PHONE_INDEX];
 	my $cellphone     = $FoF[$i][ACCT_CELL_PHONE_INDEX];
 	my $payoff        = $FoF[$i][ACCT_PAYOFF_INDEX];
+	my $state        = $EoE[$i][ACCT_REPO_INDEX];
 	
 	if ( $FoF[$i][ACCT_INSEXPIRE_DELTA_INDEX] >= $INSEXP_SKIP )
 	{
+		$numAccountsSkipped++;
 		next;
 	}
 	
-	
-	if (($FoF[$i][ACCT_REPO_INDEX] ne $REPOSSESSED) && ($FoF[$i][ACCT_REPO_INDEX] ne $INPROCESSOFREPO) && ($daysLate > 0) )
+	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($daysLate > 0))
 	{
 		my $myStyle;
 		
@@ -967,6 +979,7 @@ for my $i (reverse 0 .. $#FoF)
 	}	
 }
 print $myLateComboOutput "</table>\n";
+print $myLateComboOutput "<br><br><b>Number of Accounts Skipped (Due to Insurance Expiration Dates) = </b>",$numAccountsSkipped,"<br><br>\n";
 print $myLateComboOutput "<br><br>\n";
 print $myLateComboOutput "</body></html>\n";
 # END - Print out PAYMENT DAYS LATE
@@ -981,8 +994,8 @@ print $myLateComboOutput "</body></html>\n";
 
 $myOpenAccountIndex = 1;
 print $myOverviewOutput "<br>\n";
-print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7><I>REPOSSESSIONS REPORT</I></th></tr></table>";
-print $myOverviewOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Days Active</th><th>Last Payment</th><th>Name</th><th>Vehicle</th></tr>\n";
+print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7><I>REPOSSESSIONS and ON-HOLD REPORT</I></th></tr></table>";
+print $myOverviewOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>State</th><th>Days Active</th><th>Last Payment</th><th>Name</th><th>Vehicle</th></tr>\n";
 	
 for my $i (0 .. $#AoA)
 {
@@ -993,10 +1006,11 @@ for my $i (0 .. $#AoA)
 	my $custname      = $AoA[$i][ACCT_NAME_INDEX];
 	my $insExpire     = $AoA[$i][ACCT_INSEXPIRE_INDEX];
 	my $score         = $AoA[$i][ACCT_SCORE_INDEX];
+	my $state         = $AoA[$i][ACCT_REPO_INDEX];
 	
-	if (($AoA[$i][ACCT_REPO_INDEX] eq $REPOSSESSED) || ($AoA[$i][ACCT_REPO_INDEX] eq $INPROCESSOFREPO))
+	if (($state eq $REPOSSESSED) || ($state eq $INPROCESSOFREPO) || ($state eq $ONHOLD))
 	{
-		print $myOverviewOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$saledateDelta,"</td><td>",$lastPayment,"</td><td>",$custname,"</td><td>",$vehicle,"</td></tr>\n";
+		print $myOverviewOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$state,"</td><td>",$saledateDelta,"</td><td>",$lastPayment,"</td><td>",$custname,"</td><td>",$vehicle,"</td></tr>\n";
 		$myOpenAccountIndex++;
 	}	
 }
@@ -1008,7 +1022,7 @@ print $myOverviewOutput "</body></html>\n";
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7>ACCOUNT TOTALS REPORT</th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\"><tr><th>Days Late</th><th>Total</th><th>Percentage</th>\n";
 print $myOverviewOutput "<tr><td>On-Time Accounts</td><td>",$numAccts0DaysLate,"<td>",nearest(.01,($numAccts0DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>Repossessed or On-Hold</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>1 to 9 </td><td>",$numAccts1to9DaysLate,"<td>",nearest(.01,($numAccts1to9DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>10 to 29 </td><td>",$numAccts10to29DaysLate,"<td>",nearest(.01,($numAccts10to29DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysLate,"<td>",nearest(.01,($numAccts30to44DaysLate/$#AoA)*100),"</td></tr>";
@@ -1025,7 +1039,7 @@ print $myOverviewOutput "</table>";
 print $myOverviewOutput "<br><br>\n";
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7>ACCOUNT LAST PAYMENT TOTALS REPORT</th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\"><tr><th>Days Since Last Payment</th><th>Total</th><th>Percentage</th>\n";
-print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>Repossessed or On-Hold</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>Less than 30</td><td>",$numAccts0to30DaysSinceLastPayments,"<td>",nearest(.01,($numAccts0to30DaysSinceLastPayments/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysSinceLastPayment,"<td>",nearest(.01,($numAccts30to44DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>45 to 59</td><td>",$numAccts45to59DaysSinceLastPayment,"<td>",nearest(.01,($numAccts45to59DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
@@ -1054,7 +1068,7 @@ print $myOverviewOutput "['90-120 days',",$numAccts90to120DaysLate,"],\n";
 print $myOverviewOutput "['120-180 days',",$numAccts120to180DaysLate,"],\n";
 print $myOverviewOutput "['180-365 days',",$numAccts180to365DaysLate,"],\n";
 print $myOverviewOutput "['>= 365 days late',",$numAccts365DaysLateOrGreater,"],\n";
-print $myOverviewOutput "['Repossessed',",$numAcctsRepossessed,"] ]);\n";
+print $myOverviewOutput "['Repossessed or On-Hold',",$numAcctsRepossessed,"] ]);\n";
 
 print $myOverviewOutput "var options = {title: 'Late Accounts'};\n";
 print $myOverviewOutput "var chart = new google.visualization.PieChart(document.getElementById('piechart'));\n";
