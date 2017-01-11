@@ -106,6 +106,7 @@ if (open(HTML_OUTPUT_FILE_DAYSLATE,$filename) == 0) {
 
 my $totalNumOpenAccounts = 0;
 my $numAcctsRepossessed = 0;
+my $numAcctsOnHold=0;
 my $myOpenAccountIndex = 0;
 my $numAccountsSkipped = 0;
 my $myFoundMatchingInsVin = 0;	
@@ -195,9 +196,13 @@ while (<NEW_AM_INPUT_FILE>)
 	chomp;
 	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone) = split(",");
 	
-	if (($repostatus eq $REPOSSESSED) || ($repostatus eq $INPROCESSOFREPO) || ($repostatus eq $ONHOLD))
+	if (($repostatus eq $REPOSSESSED) || ($repostatus eq $INPROCESSOFREPO))
 	{	
 		$numAcctsRepossessed++;		
+	}
+	elsif ($repostatus eq $ONHOLD)
+	{
+		$numAcctsOnHold++;	
 	}
 	else
 	{
@@ -1022,7 +1027,8 @@ print $myOverviewOutput "</body></html>\n";
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7>ACCOUNT TOTALS REPORT</th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\"><tr><th>Days Late</th><th>Total</th><th>Percentage</th>\n";
 print $myOverviewOutput "<tr><td>On-Time Accounts</td><td>",$numAccts0DaysLate,"<td>",nearest(.01,($numAccts0DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>Repossessed or On-Hold</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>On-Hold</td><td>",$numAcctsOnHold,"<td>",nearest(.01,($numAcctsOnHold/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>1 to 9 </td><td>",$numAccts1to9DaysLate,"<td>",nearest(.01,($numAccts1to9DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>10 to 29 </td><td>",$numAccts10to29DaysLate,"<td>",nearest(.01,($numAccts10to29DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysLate,"<td>",nearest(.01,($numAccts30to44DaysLate/$#AoA)*100),"</td></tr>";
@@ -1032,14 +1038,15 @@ print $myOverviewOutput "<tr><td>90 to 120</td><td>",$numAccts90to120DaysLate,"<
 print $myOverviewOutput "<tr><td>120 to 180</td><td>",$numAccts120to180DaysLate,"<td>",nearest(.01,($numAccts120to180DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>180 to 365</td><td>",$numAccts180to365DaysLate,"<td>",nearest(.01,($numAccts180to365DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>365 or greater</td><td>",$numAccts365DaysLateOrGreater,"<td>",nearest(.01,($numAccts365DaysLateOrGreater/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td> Total Open Accounts (minus repos): </td><td>",$totalNumOpenAccounts,"</td></tr>";
-print $myOverviewOutput "<tr><td> Total Open Accounts (with repos): </td><td>",$totalNumOpenAccounts + $numAcctsRepossessed,"</td></tr>";
+print $myOverviewOutput "<tr><td> Total Open Accounts (minus repos and holds): </td><td>",$totalNumOpenAccounts,"</td></tr>";
+print $myOverviewOutput "<tr><td> Total Open Accounts (with repos and holds): </td><td>",$totalNumOpenAccounts + $numAcctsRepossessed + $numAcctsOnHold,"</td></tr>";
 print $myOverviewOutput "</table>";
 
 print $myOverviewOutput "<br><br>\n";
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7>ACCOUNT LAST PAYMENT TOTALS REPORT</th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\"><tr><th>Days Since Last Payment</th><th>Total</th><th>Percentage</th>\n";
-print $myOverviewOutput "<tr><td>Repossessed or On-Hold</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>On-Hold</td><td>",$numAcctsOnHold,"<td>",nearest(.01,($numAcctsOnHold/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>Less than 30</td><td>",$numAccts0to30DaysSinceLastPayments,"<td>",nearest(.01,($numAccts0to30DaysSinceLastPayments/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysSinceLastPayment,"<td>",nearest(.01,($numAccts30to44DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>45 to 59</td><td>",$numAccts45to59DaysSinceLastPayment,"<td>",nearest(.01,($numAccts45to59DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
@@ -1068,7 +1075,8 @@ print $myOverviewOutput "['90-120 days',",$numAccts90to120DaysLate,"],\n";
 print $myOverviewOutput "['120-180 days',",$numAccts120to180DaysLate,"],\n";
 print $myOverviewOutput "['180-365 days',",$numAccts180to365DaysLate,"],\n";
 print $myOverviewOutput "['>= 365 days late',",$numAccts365DaysLateOrGreater,"],\n";
-print $myOverviewOutput "['Repossessed or On-Hold',",$numAcctsRepossessed,"] ]);\n";
+print $myOverviewOutput "['Repossessed',",$numAcctsRepossessed,"] ]);\n";
+print $myOverviewOutput "['On-Hold',",$numAcctsOnHold,"] ]);\n";
 
 print $myOverviewOutput "var options = {title: 'Late Accounts'};\n";
 print $myOverviewOutput "var chart = new google.visualization.PieChart(document.getElementById('piechart'));\n";
