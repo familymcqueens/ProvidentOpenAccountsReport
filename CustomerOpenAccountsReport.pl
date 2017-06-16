@@ -1026,9 +1026,9 @@ print $myOverviewOutput "</body></html>\n";
 
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7>ACCOUNT TOTALS REPORT</th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\"><tr><th>Days Late</th><th>Total</th><th>Percentage</th>\n";
-print $myOverviewOutput "<tr><td>On-Time Accounts</td><td>",$numAccts0DaysLate,"<td>",nearest(.01,($numAccts0DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>On-Hold</td><td>",$numAcctsOnHold,"<td>",nearest(.01,($numAcctsOnHold/$#AoA)*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>On-Time (< 10)</td><td>",$numAccts0DaysLate+$numAccts1to9DaysLate,"<td>",nearest(.01,(($numAccts0DaysLate+$numAccts1to9DaysLate)/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>1 to 9 </td><td>",$numAccts1to9DaysLate,"<td>",nearest(.01,($numAccts1to9DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>10 to 29 </td><td>",$numAccts10to29DaysLate,"<td>",nearest(.01,($numAccts10to29DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysLate,"<td>",nearest(.01,($numAccts30to44DaysLate/$#AoA)*100),"</td></tr>";
