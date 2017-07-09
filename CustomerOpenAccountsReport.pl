@@ -41,7 +41,9 @@ my $timeend;
 	ACCT_HOME_PHONE_INDEX => 12,
 	ACCT_CELL_PHONE_INDEX => 13,
 	ACCT_WORK_PHONE_INDEX => 14,
-	MAX_INDEX_VALUE => 15
+	ACCT_TOTAL_DUE_INDEX => 15,
+	ACCT_PAYMENTS_DUE_INDEX => 16,
+	MAX_INDEX_VALUE => 17
 };
 
 # Get current date/time
@@ -152,8 +154,8 @@ if (open(NEW_AM_INPUT_FILE,$filename) == 0) {
 while (<AM_INPUT_FILE>) 
 {
 	chomp;
-	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone) = split(",");
-	print NEW_AM_INPUT_FILE $autoyear,",",$vin,",",$totaldue,",",$dealdate,",",$homephone,",",$payoff,",",$monthlypayment,",",$automodel,",",$automake,",",$dayslate,",",$lastpaymentdate,",",$textOk,",",$lastname,",",$firstname,",",$repostatus,",",$cellphone,",",$amtfinanced,",",$adjustbalance,",",$lastpaymentdate,",",$workphone,"\n";
+	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue) = split(",");
+	print NEW_AM_INPUT_FILE $autoyear,",",$vin,",",$totaldue,",",$dealdate,",",$homephone,",",$payoff,",",$monthlypayment,",",$automodel,",",$automake,",",$dayslate,",",$lastpaymentdate,",",$textOk,",",$lastname,",",$firstname,",",$repostatus,",",$cellphone,",",$amtfinanced,",",$adjustbalance,",",$lastpaymentdate,",",$workphone,",",$paymentsdue,"\n";
 };
 NEW_AM_INPUT_FILE->flush();
 close(AM_INPUT_FILE); 
@@ -194,7 +196,7 @@ if (open(NEW_AM_INSURANCE_FILE,$filename) == 0) {
 while (<NEW_AM_INPUT_FILE>) 
 {
 	chomp;
-	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone) = split(",");
+	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue) = split(",");
 	
 	if (($repostatus eq $REPOSSESSED) || ($repostatus eq $INPROCESSOFREPO))
 	{	
@@ -305,6 +307,8 @@ while (<NEW_AM_INPUT_FILE>)
 	$AoA[$myOpenAccountIndex][ACCT_HOME_PHONE_INDEX]        = $homephone;
 	$AoA[$myOpenAccountIndex][ACCT_CELL_PHONE_INDEX]        = $cellphone;
 	$AoA[$myOpenAccountIndex][ACCT_WORK_PHONE_INDEX]        = $workphone;
+	$AoA[$myOpenAccountIndex][ACCT_TOTAL_DUE_INDEX]         = $totaldue;
+	$AoA[$myOpenAccountIndex][ACCT_PAYMENTS_DUE_INDEX]      = $paymentsdue;
 	
 	#Set Defaults
 	$AoA[$myOpenAccountIndex][ACCT_INSEXPIRE_INDEX] = "ERROR";
@@ -383,8 +387,9 @@ while (<NEW_AM_INPUT_FILE>)
 			my $saleDateDelta = ($myToday - $saledate)/86400;
 			
 			# New accounts that are already late, go on top of the list!
-			if (($saleDateDelta <= 90) && ($dayslate > 14) ) 
+			if ((($saleDateDelta <= 90) && ($dayslate > 14)) )
 			{
+				printf $custname,"\n";
 				$lpWeight = $TOP_PRIORITY_WEIGHT;
 			}
 			else 
@@ -920,7 +925,7 @@ print $myDaysLateOutput "</body></html>\n";
 
 $myOpenAccountIndex = 1;
 $numAccountsSkipped = 0;
-print $myLateComboOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Days Active</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Exp.</th><th>Payoff</th><th>Cell Phone</th><th>Home Phone</th><th>Work Phone</th></tr>\n";
+print $myLateComboOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Days Active</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Exp.</th><th>Payments Due</th><th>Payoff</th><th>Cell Phone</th><th>Home Phone</th><th>Work Phone</th></tr>\n";
 	
 for my $i (reverse 0 .. $#FoF)
 {
@@ -939,6 +944,8 @@ for my $i (reverse 0 .. $#FoF)
 	my $cellphone     = $FoF[$i][ACCT_CELL_PHONE_INDEX];
 	my $payoff        = $FoF[$i][ACCT_PAYOFF_INDEX];
 	my $state         = $FoF[$i][ACCT_REPO_INDEX];
+    my $totaldue      = $FoF[$i][ACCT_TOTAL_DUE_INDEX];
+	my $paymentsdue   = $FoF[$i][ACCT_PAYMENTS_DUE_INDEX];
 	
 	if ( $FoF[$i][ACCT_INSEXPIRE_DELTA_INDEX] >= $INSEXP_SKIP )
 	{
@@ -974,6 +981,7 @@ for my $i (reverse 0 .. $#FoF)
 			print $myLateComboOutput $insExpire,"</td>\n";
 		}
 		
+		print $myLateComboOutput "<td>",money_format($paymentsdue),"</td>\n";
 		print $myLateComboOutput "<td>",money_format($payoff),"</td>\n";
 		print $myLateComboOutput "<td>",$cellphone,"</td>\n";
 		print $myLateComboOutput "<td>",$homephone,"</td>\n";
@@ -1026,9 +1034,9 @@ print $myOverviewOutput "</body></html>\n";
 
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7>ACCOUNT TOTALS REPORT</th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\"><tr><th>Days Late</th><th>Total</th><th>Percentage</th>\n";
-print $myOverviewOutput "<tr><td>On-Time Accounts</td><td>",$numAccts0DaysLate,"<td>",nearest(.01,($numAccts0DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>On-Hold</td><td>",$numAcctsOnHold,"<td>",nearest(.01,($numAcctsOnHold/$#AoA)*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>On-Time (< 10)</td><td>",$numAccts0DaysLate+$numAccts1to9DaysLate,"<td>",nearest(.01,(($numAccts0DaysLate+$numAccts1to9DaysLate)/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>1 to 9 </td><td>",$numAccts1to9DaysLate,"<td>",nearest(.01,($numAccts1to9DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>10 to 29 </td><td>",$numAccts10to29DaysLate,"<td>",nearest(.01,($numAccts10to29DaysLate/$#AoA)*100),"</td></tr>";
 print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysLate,"<td>",nearest(.01,($numAccts30to44DaysLate/$#AoA)*100),"</td></tr>";
