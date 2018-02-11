@@ -171,8 +171,8 @@ if (open(NEW_AM_INSURANCE_FILE,$filename) == 0) {
 while (<AM_INSURANCE_FILE>) 
 {
 	chomp;
-	($saledate,$custname,$inscompany,$insbroker,$insstart,$insexpire,$policynum,$unused1,$unused2,$insvin,$unused4) = split(",");
-	print NEW_AM_INSURANCE_FILE $saledate,",",$custname,",",$inscompany,",",$insbroker,",",$insstart,",",$insexpire,",",$policynum,",",$unused1,",",$unused2,",",$insvin,",",$unused4,"\n";
+	($saledate,$custname,$inscompany,$insbroker,$insstart,$insexpire,$policynum,$unused1,$insvin,$unused4) = split(",");
+	print NEW_AM_INSURANCE_FILE $saledate,",",$custname,",",$inscompany,",",$insbroker,",",$insstart,",",$insexpire,",",$policynum,",",$unused1,",",$insvin,",",$unused4,"\n";
 }
 NEW_AM_INSURANCE_FILE->flush();
 close(AM_INSURANCE_FILE); 
@@ -329,7 +329,7 @@ while (<NEW_AM_INPUT_FILE>)
 	while (<NEW_AM_INSURANCE_FILE>) 
 	{
 		chomp;
-		($saledate,$custname,$inscompany,$insbroker,$insstart,$insexpire,$policynum,$unused1,$unused2,$insvin,$unused4) = split(",");
+		($saledate,$custname,$inscompany,$insbroker,$insstart,$insexpire,$policynum,$unused1,$insvin,$unused4) = split(",");
 
 		$custname =~ s/^ *//;
 		$custname = sprintf("%s",uc($custname));
@@ -389,7 +389,6 @@ while (<NEW_AM_INPUT_FILE>)
 			# New accounts that are already late, go on top of the list!
 			if ((($saleDateDelta <= 90) && ($dayslate > 14)) )
 			{
-				printf $custname,"\n";
 				$lpWeight = $TOP_PRIORITY_WEIGHT;
 			}
 			else 
@@ -925,7 +924,7 @@ print $myDaysLateOutput "</body></html>\n";
 
 $myOpenAccountIndex = 1;
 $numAccountsSkipped = 0;
-print $myLateComboOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Days Active</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Exp.</th><th>Payments Due</th><th>Payoff</th><th>Cell Phone</th><th>Home Phone</th><th>Work Phone</th></tr>\n";
+print $myLateComboOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Status</th><th>Days Active</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Exp.</th><th>Payments Due</th><th>Payoff</th><th>Cell Phone</th><th>Home Phone</th><th>Work Phone</th></tr>\n";
 	
 for my $i (reverse 0 .. $#FoF)
 {
@@ -953,7 +952,7 @@ for my $i (reverse 0 .. $#FoF)
 		next;
 	}
 	
-	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($daysLate > 0))
+	#if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($daysLate > 0))
 	{
 		my $myStyle;
 		
@@ -962,7 +961,7 @@ for my $i (reverse 0 .. $#FoF)
 			$myStyle = "style=\"background-color: yellow;\"";
 		}
 		
-		print $myLateComboOutput "<tr ",$myStyle,"><td>",$myOpenAccountIndex,"</td><td>",$saleDateDelta,"</td><td>",$daysLate,"</td><td>";
+		print $myLateComboOutput "<tr ",$myStyle,"><td>",$myOpenAccountIndex,"</td><td>",$state,"</td><td>",$saleDateDelta,"</td><td>",$daysLate,"</td><td>";
 				
 		if ( $daysLate > 30 )
 		{
@@ -1142,8 +1141,8 @@ sub WriteHtmlTopPage
 	print $fileHandle "</style></head>\n";
 	print $fileHandle "<style TYPE=\"text/css\">";
 	print $fileHandle "<!--\n";
-	print $fileHandle "TD{font-family: Arial; font-size: 9pt;}\n";
-	print $fileHandle "TH{font-family: Arial; font-size: 9pt;}\n";
+	print $fileHandle "TD{font-family: Arial; font-size: 8pt;}\n";
+	print $fileHandle "TH{font-family: Arial; font-size: 8pt;}\n";
 	print $fileHandle "--->\n";
 	print $fileHandle "</style>\n";
 	print $fileHandle "<h2><i>",$reportName,"</i></h2>\n";
@@ -1154,6 +1153,5 @@ sub WriteHtmlTopPage
 	print $fileHandle "</tr></table>";	
 	print $fileHandle "<br>";
 	print $fileHandle "<table id=\"t02\"><tr><th colspan=7>",$reportType,"</th><th>",$myToday,"</th><th></th></tr></table>";
-
 
 }
