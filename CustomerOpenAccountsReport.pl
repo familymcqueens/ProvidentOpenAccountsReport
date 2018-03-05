@@ -1007,7 +1007,7 @@ print $myLateComboOutput "</body></html>\n";
 $myOpenAccountIndex = 1;
 print $myOverviewOutput "<br>\n";
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7><I>REPOSSESSIONS and ON-HOLD REPORT</I></th></tr></table>";
-print $myOverviewOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>State</th><th>Days Active</th><th>Last Payment</th><th>Name</th><th>Vehicle</th></tr>\n";
+print $myOverviewOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>State</th><th>Name</th><th>Vehicle</th><th>Days Active</th><th>Payoff</th><th>Last Payment</th></tr>\n";
 	
 for my $i (0 .. $#AoA)
 {
@@ -1019,10 +1019,12 @@ for my $i (0 .. $#AoA)
 	my $insExpire     = $AoA[$i][ACCT_INSEXPIRE_INDEX];
 	my $score         = $AoA[$i][ACCT_SCORE_INDEX];
 	my $state         = $AoA[$i][ACCT_REPO_INDEX];
+	my $payoff        = $AoA[$i][ACCT_PAYOFF_INDEX];
+	
 	
 	if (($state eq $REPOSSESSED) || ($state eq $INPROCESSOFREPO) || ($state eq $ONHOLD))
 	{
-		print $myOverviewOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$state,"</td><td>",$saledateDelta,"</td><td>",$lastPayment,"</td><td>",$custname,"</td><td>",$vehicle,"</td></tr>\n";
+		print $myOverviewOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$state,"</td><td>",$custname,"</td><td>",$vehicle,"</td><td>",$saledateDelta,"</td><td>",$payoff,"</td><td>",$lastPayment,"</td></tr>\n";
 		$myOpenAccountIndex++;
 	}	
 }
