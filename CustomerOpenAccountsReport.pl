@@ -185,6 +185,7 @@ if (open(NEW_AM_INPUT_FILE,$filename) == 0) {
    print "Error opening input AutoManager report file: ",$filename,"\n";
    exit -1;  
 }
+print "NewCompleteAccountsOverview.csv opened.\n";
 
 # Reopen for reading - NewInsuranceExpirationReport.csv
 $filename = sprintf("<%s\\NewInsuranceExpirationReport.csv",$myTodayFormat);
@@ -192,6 +193,10 @@ if (open(NEW_AM_INSURANCE_FILE,$filename) == 0) {
    print "Error opening input insurance file: ",$filename,"\n";
    exit -1;  
 }
+print "NewInsuranceExpirationReport.csv opened.\n";
+
+my $pattern='^[0-3]?[0-9]/[0-3]?[0-9]/(?:[0-9]{2})?[0-9]{2}$';  
+	
 
 while (<NEW_AM_INPUT_FILE>) 
 {
@@ -250,6 +255,11 @@ while (<NEW_AM_INPUT_FILE>)
 		{
 			$numAccts0DaysLate++;
 		}
+
+		if($lastpaymentdate !~ m/$pattern/)
+		{
+			print "AM_INPUT_FILE VIN: ",$vin, " has bad lastpaymentdate of: ", $lastpaymentdate,"\n";
+		}
 		
 		my $lpDate = Time::Piece->strptime($lastpaymentdate, "%m/%d/%yy");	
 		my $lpDelta = ($myToday - $lpDate)/86400;
@@ -295,6 +305,11 @@ while (<NEW_AM_INPUT_FILE>)
 	$totalMontlyPaymentAmount += $monthlypayment;
 	$totalAmountDue += $totaldue;
 	
+	if($dealdate !~ m/$pattern/)
+	{
+		print "AM_INPUT_FILE VIN: ",$vin, " has bad dealdate of: ", $dealdate,"\n";
+	}
+	
 	my $saleDate = Time::Piece->strptime($dealdate, "%m/%d/%yy");
 
 	$AoA[$myOpenAccountIndex][ACCT_DAYSLATE_INDEX]          = $dayslate; 
@@ -331,6 +346,9 @@ while (<NEW_AM_INPUT_FILE>)
 		chomp;
 		($saledate,$custname,$inscompany,$insbroker,$insstart,$insexpire,$policynum,$unused1,$insvin,$unused4) = split(",");
 
+		#print "saledate: ",$saledate, " name: ",$custname, " company: ",$inscompany," broker: ",$insbroker, "\n";
+		#print "start:",$insstart, " expire:",$insexpire, " policy: ",$policynum, " usused1: ", $unused1, " vin: ",$insvin, " unused4: ",$unused4,"\n";
+				
 		$custname =~ s/^ *//;
 		$custname = sprintf("%s",uc($custname));
 		
@@ -362,8 +380,17 @@ while (<NEW_AM_INPUT_FILE>)
 			}
 			else
 			{
+				if($insexpire !~ m/$pattern/)
+				{
+					print "AM_INPUT_FILE VIN: ",$vin, " has bad insexpire of: ", $insexpire,"\n";
+				}
 				$insExpDate = Time::Piece->strptime($insexpire, "%m/%d/%yy");	
 				$insExpDelta = ($myToday - $insExpDate)/86400;		
+			}
+			
+			if($lastpaymentdate !~ m/$pattern/)
+			{
+				print "AM_INPUT_FILE VIN: ",$vin, " has bad insexpire of: ", $lastpaymentdate,"\n";
 			}
 			
 			my $lpDate = Time::Piece->strptime($lastpaymentdate, "%m/%d/%yy");	
@@ -952,7 +979,7 @@ for my $i (reverse 0 .. $#FoF)
 		next;
 	}
 	
-	#if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($daysLate > 0))
+	if (($state ne $REPOSSESSED) )  #&& ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($daysLate > 0)
 	{
 		my $myStyle;
 		
