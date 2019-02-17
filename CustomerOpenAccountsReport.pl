@@ -154,7 +154,8 @@ if (open(NEW_AM_INPUT_FILE,$filename) == 0) {
 while (<AM_INPUT_FILE>) 
 {
 	chomp;
-	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue) = split(",");
+	($autoyear,$automake,$automodel,$lastname,$firstname,$lastpaymentdate,$vin,$totaldue,$dealdate,$payoff,$monthlypayment,$amtfinanced,$paymentsdue,$adjustbalance,$repostatus,$cellphone,$homephone,$workphone,$dayslate) = split(",");
+	#($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue) = split(",");
 	print NEW_AM_INPUT_FILE $autoyear,",",$vin,",",$totaldue,",",$dealdate,",",$homephone,",",$payoff,",",$monthlypayment,",",$automodel,",",$automake,",",$dayslate,",",$lastpaymentdate,",",$textOk,",",$lastname,",",$firstname,",",$repostatus,",",$cellphone,",",$amtfinanced,",",$adjustbalance,",",$lastpaymentdate,",",$workphone,",",$paymentsdue,"\n";
 };
 NEW_AM_INPUT_FILE->flush();
@@ -171,7 +172,7 @@ if (open(NEW_AM_INSURANCE_FILE,$filename) == 0) {
 while (<AM_INSURANCE_FILE>) 
 {
 	chomp;
-	($saledate,$custname,$inscompany,$insbroker,$insstart,$insexpire,$policynum,$unused1,$insvin,$unused4) = split(",");
+	($saledate,$custname,$inscompany,$insbroker,$insstart,$insexpire,$policynum,$unused1,$unused2,$insvin,$unused4) = split(",");
 	print NEW_AM_INSURANCE_FILE $saledate,",",$custname,",",$inscompany,",",$insbroker,",",$insstart,",",$insexpire,",",$policynum,",",$unused1,",",$insvin,",",$unused4,"\n";
 }
 NEW_AM_INSURANCE_FILE->flush();
@@ -258,7 +259,7 @@ while (<NEW_AM_INPUT_FILE>)
 
 		if($lastpaymentdate !~ m/$pattern/)
 		{
-			print "AM_INPUT_FILE VIN: ",$vin, " has bad lastpaymentdate of: ", $lastpaymentdate,"\n";
+			print "NEW_AM_INPUT_FILE VIN: ",$vin, " has bad lastpaymentdate of: ", $lastpaymentdate,"\n";
 		}
 		
 		my $lpDate = Time::Piece->strptime($lastpaymentdate, "%m/%d/%yy");	
