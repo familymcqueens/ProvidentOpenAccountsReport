@@ -154,7 +154,7 @@ if (open(NEW_AM_INPUT_FILE,$filename) == 0) {
 while (<AM_INPUT_FILE>) 
 {
 	chomp;
-	($autoyear,$automake,$automodel,$lastname,$firstname,$lastpaymentdate,$vin,$totaldue,$dealdate,$payoff,$monthlypayment,$amtfinanced,$paymentsdue,$adjustbalance,$repostatus,$cellphone,$homephone,$workphone,$dayslate) = split(",");
+	($autoyear,$automake,$automodel,$lastname,$firstname,$lastpaymentdate,$vin,$totaldue,$dealdate,$payoff,$monthlypayment,$amtfinanced,$adjustbalance,$paymentsdue,$repostatus,$cellphone,$homephone,$workphone,$dayslate) = split(",");
 	#($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue) = split(",");
 	print NEW_AM_INPUT_FILE $autoyear,",",$vin,",",$totaldue,",",$dealdate,",",$homephone,",",$payoff,",",$monthlypayment,",",$automodel,",",$automake,",",$dayslate,",",$lastpaymentdate,",",$textOk,",",$lastname,",",$firstname,",",$repostatus,",",$cellphone,",",$amtfinanced,",",$adjustbalance,",",$lastpaymentdate,",",$workphone,",",$paymentsdue,"\n";
 };
@@ -203,7 +203,7 @@ while (<NEW_AM_INPUT_FILE>)
 {
 	chomp;
 	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue) = split(",");
-	
+
 	if (($repostatus eq $REPOSSESSED) || ($repostatus eq $INPROCESSOFREPO))
 	{	
 		$numAcctsRepossessed++;		
@@ -312,7 +312,12 @@ while (<NEW_AM_INPUT_FILE>)
 	}
 	
 	my $saleDate = Time::Piece->strptime($dealdate, "%m/%d/%yy");
-
+	
+	if ($paymentsdue < 0 )
+	{
+		$paymentsdue = 0;
+	}
+	
 	$AoA[$myOpenAccountIndex][ACCT_DAYSLATE_INDEX]          = $dayslate; 
 	$AoA[$myOpenAccountIndex][ACCT_CAR_INDEX]               = sprintf("%s %s %s",$autoyear,$automake,$automodel); 
 	$AoA[$myOpenAccountIndex][ACCT_LASTPAYMENT_INDEX]       = $lastpaymentdate; 
@@ -436,6 +441,11 @@ while (<NEW_AM_INPUT_FILE>)
 				{
 					$lpWeight = $lpWeight/2;
 				}
+			}
+			
+			if ($paymentsdue == 0)
+			{
+				$lpWeight = $dlWeight = 0;
 			}
 			
 			# If last payment was made within 2 weeks, half the weight of the insurance expiration.
