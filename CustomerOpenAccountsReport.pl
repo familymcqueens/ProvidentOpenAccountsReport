@@ -10,20 +10,20 @@ my $timeend;
 
  my @AoA;  # Full listing
  my @BoB;  # Score Sort
- my @CoC;  # Last Payment Date Sort
- my @DoD;  # Insurance Expiration Sort
- my @EoE;  # Days Late Sort
  my @FoF;  # Days Late + Last Payment Sort
  
  
  my $REPOSSESSED = "Reposessed";
  my $INPROCESSOFREPO = "In Process of Repo";
  my $ONHOLD = "Hold";
- my $INS_SCORE_WEIGHT = 5.5;
- my $LAST_PAYMENT_WEIGHT = 5;
+ 
+ my $INS_SCORE_WEIGHT = 15;
+ my $LAST_PAYMENT_WEIGHT = 10;
  my $DAYS_LATE_WEIGHT = .25;
  my $TOP_PRIORITY_WEIGHT = 1000;
  my $INSEXP_SKIP = 500;
+ my $INS_EXPIRE_10_DAYS_LATE = 10;
+ my $PAYMENT_LATE_30_DAYS = 30;
  
  use constant {
 	ACCT_DAYSLATE_INDEX   => 0,
@@ -43,7 +43,11 @@ my $timeend;
 	ACCT_WORK_PHONE_INDEX => 14,
 	ACCT_TOTAL_DUE_INDEX => 15,
 	ACCT_PAYMENTS_DUE_INDEX => 16,
-	MAX_INDEX_VALUE => 17
+	INS_WEIGHT => 17,
+	LP_WEIGHT => 18,
+	DL_WEIGHT => 19,
+	PO_WEIGHT => 20,
+	MAX_INDEX_VALUE => 21
 };
 
 # Get current date/time
@@ -87,24 +91,6 @@ if (open(HTML_OUTPUT_FILE_COMBO_LATE,$filename) == 0) {
    print "Error opening: %s",$filename,"\n";
    exit -1;
 } 
-
-$filename = sprintf(">%s\\OpenAcctLatePayment_%s.html",$myTodayFormat,$myTodayFormat);
-if (open(HTML_OUTPUT_FILE_LASTPAYMENT,$filename) == 0) {
-   print "Error opening: %s",$filename,"\n";
-   exit -1;  
-}
-
-$filename = sprintf(">%s\\OpenAcctInsurance_%s.html",$myTodayFormat,$myTodayFormat);
-if (open(HTML_OUTPUT_FILE_INSURANCE,$filename) == 0) {
-   print "Error opening: %s",$filename,"\n";
-   exit -1;  
-}
-
-$filename = sprintf(">%s\\OpenAcctDaysLate_%s.html",$myTodayFormat,$myTodayFormat);
-if (open(HTML_OUTPUT_FILE_DAYSLATE,$filename) == 0) {
-   print "Error opening: %s",$filename,"\n";
-   exit -1;  
-}
 
 my $totalNumOpenAccounts = 0;
 my $numAcctsRepossessed = 0;
@@ -155,7 +141,6 @@ while (<AM_INPUT_FILE>)
 {
 	chomp;
 	($autoyear,$automake,$automodel,$lastname,$firstname,$lastpaymentdate,$vin,$totaldue,$dealdate,$payoff,$monthlypayment,$amtfinanced,$adjustbalance,$paymentsdue,$repostatus,$cellphone,$homephone,$workphone,$dayslate) = split(",");
-	#($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue) = split(",");
 	print NEW_AM_INPUT_FILE $autoyear,",",$vin,",",$totaldue,",",$dealdate,",",$homephone,",",$payoff,",",$monthlypayment,",",$automodel,",",$automake,",",$dayslate,",",$lastpaymentdate,",",$textOk,",",$lastname,",",$firstname,",",$repostatus,",",$cellphone,",",$amtfinanced,",",$adjustbalance,",",$lastpaymentdate,",",$workphone,",",$paymentsdue,"\n";
 };
 NEW_AM_INPUT_FILE->flush();
@@ -204,7 +189,12 @@ while (<NEW_AM_INPUT_FILE>)
 	chomp;
 	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue) = split(",");
 
-	if (($repostatus eq $REPOSSESSED) || ($repostatus eq $INPROCESSOFREPO))
+	if( length ($vin) == 0 )   #Another way to check for EoF: if($lastpaymentdate !~ m/$pattern/)
+	{
+		print "EOF DETECTION: VIN: [",$vin, "] NAME: [",$firstname," ",$lastname,"]\n";
+		next;
+	}	
+	elsif (($repostatus eq $REPOSSESSED) || ($repostatus eq $INPROCESSOFREPO))
 	{	
 		$numAcctsRepossessed++;		
 	}
@@ -216,7 +206,11 @@ while (<NEW_AM_INPUT_FILE>)
 	{
 		my $AoADaysLate = $dayslate;		
 
-		if ($AoADaysLate >= 1 && $AoADaysLate < 10)
+		if ($AoADaysLate == 0 )
+		{
+			$numAccts0DaysLate++;
+		}
+		elsif ($AoADaysLate >= 1 && $AoADaysLate < 10)
 		{
 			$numAccts1to9DaysLate++;
 		}
@@ -254,14 +248,9 @@ while (<NEW_AM_INPUT_FILE>)
 		}
 		else 
 		{
-			$numAccts0DaysLate++;
+			print "Unknown # days late (",$AoADaysLate,") : ",$lastname," ",$firstname,"\n";								
 		}
 
-		if($lastpaymentdate !~ m/$pattern/)
-		{
-			print "NEW_AM_INPUT_FILE VIN: ",$vin, " has bad lastpaymentdate of: ", $lastpaymentdate,"\n";
-		}
-		
 		my $lpDate = Time::Piece->strptime($lastpaymentdate, "%m/%d/%yy");	
 		my $lpDelta = ($myToday - $lpDate)/86400;
 		
@@ -305,11 +294,6 @@ while (<NEW_AM_INPUT_FILE>)
 	$totalPayoffAmount += ($payoff);
 	$totalMontlyPaymentAmount += $monthlypayment;
 	$totalAmountDue += $totaldue;
-	
-	if($dealdate !~ m/$pattern/)
-	{
-		print "AM_INPUT_FILE VIN: ",$vin, " has bad dealdate of: ", $dealdate,"\n";
-	}
 	
 	my $saleDate = Time::Piece->strptime($dealdate, "%m/%d/%yy");
 	
@@ -388,7 +372,7 @@ while (<NEW_AM_INPUT_FILE>)
 			{
 				if($insexpire !~ m/$pattern/)
 				{
-					print "AM_INPUT_FILE VIN: ",$vin, " has bad insexpire of: ", $insexpire,"\n";
+					print "AM_INPUT_FILE VIN: ",$vin, " has bad insurance expiration of: ", $insexpire,"\n";
 				}
 				$insExpDate = Time::Piece->strptime($insexpire, "%m/%d/%yy");	
 				$insExpDelta = ($myToday - $insExpDate)/86400;		
@@ -396,7 +380,7 @@ while (<NEW_AM_INPUT_FILE>)
 			
 			if($lastpaymentdate !~ m/$pattern/)
 			{
-				print "AM_INPUT_FILE VIN: ",$vin, " has bad insexpire of: ", $lastpaymentdate,"\n";
+				print "AM_INPUT_FILE VIN: ",$vin, " has bad insurance expiration of: ", $lastpaymentdate,"\n";
 			}
 			
 			my $lpDate = Time::Piece->strptime($lastpaymentdate, "%m/%d/%yy");	
@@ -407,14 +391,9 @@ while (<NEW_AM_INPUT_FILE>)
 				$insExpDelta = 0;
 			}
 			
-			if ( $dayslate eq 0 )
-			{
-				$lpDelta = 0;
-			}
-			
-			my $lpWeight = $LAST_PAYMENT_WEIGHT;
-			my $insWeight = $INS_SCORE_WEIGHT;
-			my $dlWeight = $DAYS_LATE_WEIGHT;
+			my $lpWeight = $LAST_PAYMENT_WEIGHT;  # 5
+			my $insWeight = $INS_SCORE_WEIGHT;    # 6
+			my $dlWeight = $DAYS_LATE_WEIGHT;     # .25
 			
 			my $saledate = Time::Piece->strptime($saledate, "%m/%d/%yy");
 			my $saleDateDelta = ($myToday - $saledate)/86400;
@@ -422,56 +401,79 @@ while (<NEW_AM_INPUT_FILE>)
 			# New accounts that are already late, go on top of the list!
 			if ((($saleDateDelta <= 90) && ($dayslate > 14)) )
 			{
-				$lpWeight = $TOP_PRIORITY_WEIGHT;
+				$lpWeight = $TOP_PRIORITY_WEIGHT;  # 1000
 			}
 			else 
 			{
-				# If last payment was made within 3 weeks, half the weight of last payment
+				# If last payment was made within 3 weeks, apply 1/4 of weight
 				if ( $dayslate < 28 )
 				{
-					$lpWeight = $lpWeight/4;
+					$lpWeight /= 4;
 				}
 				
+				# If the last payment was made < 3 weeks, apply 1/3 of the weight
 				if ( $dayslate < 21 )
 				{
-					$lpWeight = $lpWeight/3;
+					$lpWeight /= 3;
 				}
 				
+				# If the last payment was made < 2 weeks, apply 1/2 of the weight
 				if ( $lpDelta < 14 )
 				{
-					$lpWeight = $lpWeight/2;
+					$lpWeight /= 2;
 				}
 			}
 			
+			# If no payment is due, the last payment weight = ZERO
 			if ($paymentsdue == 0)
 			{
 				$lpWeight = $dlWeight = 0;
 			}
 			
 			# If last payment was made within 2 weeks, half the weight of the insurance expiration.
-			if ( $insExpDelta <= 10 )
+			if ( $insExpDelta <= $INS_EXPIRE_10_DAYS_LATE )
 			{
-				$insWeight = $insWeight/2;
+				$insWeight = 0;
 			}			
-					
-			my $score = sprintf("%d",($dayslate*$dlWeight) + ($lpDelta*$lpWeight) + ($insExpDelta*$insWeight));
-			my $lateComboScore;
-			
-			# If Insurance is greater than 10 days past due; then, add in an insurance weight to total.
-			if ( $insExpDelta > 10 )
+
+			if ($dayslate <= 10)
 			{
-				$lateComboScore = sprintf("%d",($dayslate*$dlWeight) + ($lpDelta*$lpWeight) + ($insExpDelta*$insWeight));
+				$dlWeight = 0;
+				$lpWeight = 0;	
+			}	
+			
+			if ( $insExpDelta > 14 )
+			{
+				$poWeight = .20;
 			}
 			else
 			{
-				$lateComboScore = sprintf("%d",($dayslate*$dlWeight) + ($lpDelta*$lpWeight));
+				$poWeight = .10;
 			}
+
+			# If the account is less than 30 days past due, do not add in the payoff to the score mix.
+			if ($dayslate <= $PAYMENT_LATE_30_DAYS || $lpDelta <= $PAYMENT_LATE_30_DAYS)
+			{
+				$poWeight = 0;				
+			}			
+			
+			####
+			####  SCORE
+			####
+			#print "name: ", $custname, ":",int($dayslate*$dlWeight),":",int($lpDelta*$lpWeight), ":", int($insExpDelta*$insWeight), ":", int($payoff*$poWeight),"\n";
+			
+			#my $score = sprintf("%d",($dayslate*$dlWeight) + ($lpDelta*$lpWeight) + ($insExpDelta*$insWeight) + ($payoff/$poWeight));
+			my $score = sprintf("%d",($dayslate*$dlWeight)+($lpDelta*$lpWeight) + ($insExpDelta*$insWeight)+($payoff*$poWeight));			
 			
 			$AoA[$myOpenAccountIndex][ACCT_INSEXPIRE_INDEX] = $insexpire;
 			$AoA[$myOpenAccountIndex][ACCT_INSEXPIRE_DELTA_INDEX]   = sprintf("%d",$insExpDelta);	
 			$AoA[$myOpenAccountIndex][ACCT_LASTPAYMENT_DELTA_INDEX] = sprintf("%d",$lpDelta);
+			$AoA[$myOpenAccountIndex][INS_WEIGHT] = $insWeight;
+			$AoA[$myOpenAccountIndex][DL_WEIGHT] =  $dlWeight;
+			$AoA[$myOpenAccountIndex][LP_WEIGHT] = $lpWeight;
+			$AoA[$myOpenAccountIndex][PO_WEIGHT] = $poWeight;
 			$AoA[$myOpenAccountIndex][ACCT_SCORE_INDEX] = $score;
-			$AoA[$myOpenAccountIndex][ACCT_LATE_COMBO_INDEX] = $lateComboScore;
+			$AoA[$myOpenAccountIndex][ACCT_LATE_COMBO_INDEX] = $score;
 
 			if ($dayslate > $myMaxDaysLate)
 			{
@@ -509,25 +511,15 @@ while (<NEW_AM_INPUT_FILE>)
 	$myOpenAccountIndex++;			
 }
 
-# Adjust counter minus one since it was incremented 
-# before while() EoF check.
-$totalNumOpenAccounts--;
-
 close(NEW_AM_INPUT_FILE); 
 close(NEW_AM_INSURANCE_FILE);
 print "File input into memory success!\n";
 
 my $myScoreOutput     = HTML_OUTPUT_FILE_SCORE;
-my $myLastPayOutput   = HTML_OUTPUT_FILE_LASTPAYMENT;
-my $myInsOutput       = HTML_OUTPUT_FILE_INSURANCE;
-my $myDaysLateOutput  = HTML_OUTPUT_FILE_DAYSLATE;
 my $myLateComboOutput = HTML_OUTPUT_FILE_COMBO_LATE;
 my $myOverviewOutput  = HTML_OUTPUT_FILE_OVERVIEW;
 
 WriteHtmlTopPage($myScoreOutput,"Provident Open Accounts Report","SCORE");
-WriteHtmlTopPage($myLastPayOutput,"Provident Open Accounts Report","LAST PAYMENT DATE");
-WriteHtmlTopPage($myInsOutput,"Provident Open Accounts Report","INSURANCE EXPIRATION");
-WriteHtmlTopPage($myDaysLateOutput,"Provident Open Accounts Report","DAYS LATE");
 WriteHtmlTopPage($myLateComboOutput,"Provident Open Accounts Report","WEIGHTED-LATE");
 WriteHtmlTopPage($myOverviewOutput,"Provident Open Accounts Report","OVERVIEW");
 
@@ -536,19 +528,20 @@ $myMaxLastPaymentDate     = sprintf("%d",$myMaxLastPaymentDate);
 $myMaxInsuranceExpiration = sprintf("%d",$myMaxInsuranceExpiration);
 $myMaxLateAndInsExpired   = sprintf("%d",$myMaxLateAndInsExpired);
 
-print "SIZE OF AoA (All Accounts): ",$#AoA,"\n";
+print "SIZE OF AoA (All Accounts): ",scalar @AoA,"\n";
 
 ########################
 # BoB is sorted by SCORE
 ########################
 
-for my $i (0 .. $#AoA) 
+for my $i (0 .. scalar(@AoA)-1) 
 {
 	for my $j (0 .. MAX_INDEX_VALUE-1)
 	{
 		$BoB[$i][$j] = $AoA[$i][$j];
 	}	
 }
+
 
 my $changeMade = 1;
 my $numChangesMade = 0;
@@ -557,10 +550,16 @@ while ($changeMade eq 1)
 {
 	$changeMade = 0;
 	
-	for my $i (0 .. ($#BoB - 1)) 
+	for my $i (0 .. (scalar(@BoB) - 1)) 
 	{
 		my $currentIndex = $i;
 		my $nextIndex  = $i+1;
+		
+		if ($currentIndex == scalar(@BoB) - 1)
+		{
+			# Kick out here before trying to access $BoB[$nextIndex]
+			next; 
+		}
 		
 		my $aoaScore     = $BoB[$currentIndex][ACCT_SCORE_INDEX];		
 		my $aoaScoreNext = $BoB[$nextIndex][ACCT_SCORE_INDEX];
@@ -591,106 +590,14 @@ while ($changeMade eq 1)
 
 }	
 
-print "SIZE OF BoB (Sorted by Score Accounts): ",$#BoB,"\n";
-
-
-###################################
-#CoC is sorted by LAST PAYMENT DATE
-###################################
-$arrayIndex=0;
-
-for (my $j = $myMaxLastPaymentDate,$arrayIndex=0; $j >=0; $j--)
-{
-    for my $i (0 .. $#AoA) 
-	{		
-		if ( ($AoA[$i][ACCT_LASTPAYMENT_DELTA_INDEX] eq $j) && ($AoA[$i][ACCT_INSEXPIRE_DELTA_INDEX] < $INSEXP_SKIP) )
-		{
-			$CoC[$arrayIndex][ACCT_DAYSLATE_INDEX]          = $AoA[$i][ACCT_DAYSLATE_INDEX];
-			$CoC[$arrayIndex][ACCT_CAR_INDEX]               = uc($AoA[$i][ACCT_CAR_INDEX]);
-			$CoC[$arrayIndex][ACCT_LASTPAYMENT_INDEX]       = $AoA[$i][ACCT_LASTPAYMENT_INDEX];
-			$CoC[$arrayIndex][ACCT_NAME_INDEX]              = $AoA[$i][ACCT_NAME_INDEX]; 
-			$CoC[$arrayIndex][ACCT_REPO_INDEX]              = $AoA[$i][ACCT_REPO_INDEX];
-			$CoC[$arrayIndex][ACCT_INSEXPIRE_INDEX]         = $AoA[$i][ACCT_INSEXPIRE_INDEX];
-            $CoC[$arrayIndex][ACCT_INSEXPIRE_DELTA_INDEX]   = $AoA[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
-			$CoC[$arrayIndex][ACCT_LASTPAYMENT_DELTA_INDEX] = $AoA[$i][ACCT_LASTPAYMENT_DELTA_INDEX];
-			$CoC[$arrayIndex][ACCT_SCORE_INDEX]             = $AoA[$i][ACCT_SCORE_INDEX];
-			$CoC[$arrayIndex][ACCT_SALE_DATE_DELTA_INDEX]   = $AoA[$i][ACCT_SALE_DATE_DELTA_INDEX];
-			$CoC[$arrayIndex][ACCT_PAYOFF_INDEX]            = $AoA[$i][ACCT_PAYOFF_INDEX];	
-			$arrayIndex++;
-			next;
-		}		
-   } 
-}
-
-print "SIZE OF CoC (Sorted by Last Payment Date): ",$#CoC,"\n";
-
-############################################
-#DoD is sorted by INSURANCE EXPIRATION DELTA
-############################################
-$arrayIndex=0;
-
-for (my $j = $myMaxInsuranceExpiration,$arrayIndex=0; $j >=0; $j--)
-{
-    for my $i (0 .. $#AoA) 
-	{
-		if ( $AoA[$i][ACCT_INSEXPIRE_DELTA_INDEX] eq $j )
-		{
-			$DoD[$arrayIndex][ACCT_DAYSLATE_INDEX]          = $AoA[$i][ACCT_DAYSLATE_INDEX];
-			$DoD[$arrayIndex][ACCT_CAR_INDEX]               = uc($AoA[$i][ACCT_CAR_INDEX]);
-			$DoD[$arrayIndex][ACCT_LASTPAYMENT_INDEX]       = $AoA[$i][ACCT_LASTPAYMENT_INDEX];
-			$DoD[$arrayIndex][ACCT_NAME_INDEX]              = $AoA[$i][ACCT_NAME_INDEX]; 
-			$DoD[$arrayIndex][ACCT_REPO_INDEX]              = $AoA[$i][ACCT_REPO_INDEX];
-			$DoD[$arrayIndex][ACCT_INSEXPIRE_INDEX]         = $AoA[$i][ACCT_INSEXPIRE_INDEX];
-            $DoD[$arrayIndex][ACCT_INSEXPIRE_DELTA_INDEX]   = $AoA[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
-			$DoD[$arrayIndex][ACCT_LASTPAYMENT_DELTA_INDEX] = $AoA[$i][ACCT_LASTPAYMENT_DELTA_INDEX];
-			$DoD[$arrayIndex][ACCT_SCORE_INDEX]             = $AoA[$i][ACCT_SCORE_INDEX];
-			$DoD[$arrayIndex][ACCT_SALE_DATE_DELTA_INDEX]   = $AoA[$i][ACCT_SALE_DATE_DELTA_INDEX];
-			$DoD[$arrayIndex][ACCT_PAYOFF_INDEX]            = $AoA[$i][ACCT_PAYOFF_INDEX];	
-			$arrayIndex++;
-			next;
-		}
-	} 
-}
-
-print "SIZE OF DoD (Sorted by Insurance Expiration): ",$#DoD,"\n";
-
-
-############################################
-#EoE is sorted by PAYMENT DAYS LATE
-############################################
-$arrayIndex=0;
-
-for (my $j = $myMaxDaysLate,$arrayIndex=0; $j >=0; $j--)
-{
-    for my $i (0 .. $#AoA) 
-	{
-		if ( ($AoA[$i][ACCT_DAYSLATE_INDEX] eq $j) && ($AoA[$i][ACCT_INSEXPIRE_DELTA_INDEX] < $INSEXP_SKIP) )
-		{
-			$EoE[$arrayIndex][ACCT_DAYSLATE_INDEX]          = $AoA[$i][ACCT_DAYSLATE_INDEX];
-			$EoE[$arrayIndex][ACCT_CAR_INDEX]               = uc($AoA[$i][ACCT_CAR_INDEX]);
-			$EoE[$arrayIndex][ACCT_LASTPAYMENT_INDEX]       = $AoA[$i][ACCT_LASTPAYMENT_INDEX];
-			$EoE[$arrayIndex][ACCT_NAME_INDEX]              = $AoA[$i][ACCT_NAME_INDEX]; 
-			$EoE[$arrayIndex][ACCT_REPO_INDEX]              = $AoA[$i][ACCT_REPO_INDEX];
-			$EoE[$arrayIndex][ACCT_INSEXPIRE_INDEX]         = $AoA[$i][ACCT_INSEXPIRE_INDEX];
-            $EoE[$arrayIndex][ACCT_INSEXPIRE_DELTA_INDEX]   = $AoA[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
-			$EoE[$arrayIndex][ACCT_LASTPAYMENT_DELTA_INDEX] = $AoA[$i][ACCT_LASTPAYMENT_DELTA_INDEX];
-			$EoE[$arrayIndex][ACCT_SCORE_INDEX]             = $AoA[$i][ACCT_SCORE_INDEX];
-			$EoE[$arrayIndex][ACCT_SALE_DATE_DELTA_INDEX]   = $AoA[$i][ACCT_SALE_DATE_DELTA_INDEX];
-			$EoE[$arrayIndex][ACCT_PAYOFF_INDEX]            = $AoA[$i][ACCT_PAYOFF_INDEX];				
-			$arrayIndex++;
-			next;
-		}
-	} 
-}
-
-print "SIZE OF EoE (Sorted by Payment Days Late): ",$#EoE,"\n";
+print "SIZE OF BoB (Sorted by Score Accounts): ",scalar @BoB,"\n";
 
 
 ############################################
 #FoF is sorted by DAYS LATE COMBO
 ############################################
 
-for my $i (0 .. $#AoA) 
+for my $i (0 .. scalar(@AoA)-1) 
 {
 	for my $j (0 .. MAX_INDEX_VALUE-1)
 	{
@@ -704,10 +611,16 @@ while ($changeMade eq 1)
 {
 	$changeMade = 0;
 	
-	for my $i (0 .. ($#FoF - 1)) 
+	for my $i (0 .. scalar(@FoF) - 1) 
 	{
 		my $currentIndex = $i;
 		my $nextIndex  = $i+1;
+		
+		if ($currentIndex == scalar(@FoF) - 1)
+		{
+			# Kick out here before trying to access $FoF[$nextIndex]
+			next; 
+		}
 		
 		my $score     = $FoF[$currentIndex][ACCT_LATE_COMBO_INDEX];		
 		my $scoreNext = $FoF[$nextIndex][ACCT_LATE_COMBO_INDEX];
@@ -737,7 +650,7 @@ while ($changeMade eq 1)
 	}
 }	
 
-print "SIZE OF FoF (Sorted by Days Late Combination): ",$#FoF,"\n";
+print "SIZE OF FoF (Sorted by Days Late Combination): ",scalar(@FoF),"\n";
 
 
 ################################
@@ -746,9 +659,9 @@ print "SIZE OF FoF (Sorted by Days Late Combination): ",$#FoF,"\n";
 
 $myOpenAccountIndex = 1;
 $numAccountsSkipped = 0;
-print $myScoreOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Score</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Payoff</th><th>Insurance Expiration</th></tr>\n";
+print $myScoreOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Score</th><th>Days Late</th><th>DL Weight</th><th>DL Calc</th><th>Last Payment</th><th>LP Weight</td><th>LP Delta</th><th>LP Calc</th><th>Name</th><th>Vehicle</th><th>Payoff</th><th>PO Weight</th><th>PO Calc</th><th>Ins. Exp.</th><th>Ins. Weight</th><th>Ins. Calc</th></tr>\n";
 
-for my $i (reverse 0 .. $#BoB)
+for my $i (reverse 0 .. scalar(@BoB)-1)
 {
 	my $daysLate     	= $BoB[$i][ACCT_DAYSLATE_INDEX];
 	my $vehicle      	= $BoB[$i][ACCT_CAR_INDEX];
@@ -761,6 +674,12 @@ for my $i (reverse 0 .. $#BoB)
 	my $saleDateDelta   = $BoB[$i][ACCT_SALE_DATE_DELTA_INDEX];
 	my $payoff          = $BoB[$i][ACCT_PAYOFF_INDEX];
 	my $state           = $BoB[$i][ACCT_REPO_INDEX];
+	my $insWeight       = sprintf("%.2f",$BoB[$i][INS_WEIGHT]);
+	my $lpWeight        = sprintf("%.2f",$BoB[$i][LP_WEIGHT]);
+	my $dlWeight        = sprintf("%.2f",$BoB[$i][DL_WEIGHT]);
+	my $poWeight        = sprintf("%.2f",$BoB[$i][PO_WEIGHT]);
+	
+	#print $custname," IW: ", $insWeight, " LP: ", $lpWeight, " DL: ", $dlWeight, "\n";
 	
 	if ( $BoB[$i][ACCT_INSEXPIRE_DELTA_INDEX] >= $INSEXP_SKIP )
 	{
@@ -768,7 +687,7 @@ for my $i (reverse 0 .. $#BoB)
 		next;
 	}
 		
-	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) )
+	if (($state ne $REPOSSESSED)) #&& ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) )
 	{
 		my $myStyle;
 		
@@ -777,23 +696,23 @@ for my $i (reverse 0 .. $#BoB)
 			$myStyle = "style=\"background-color: yellow;\"";
 		}
 		
-		print $myScoreOutput "<tr ",$myStyle,"><td>",$myOpenAccountIndex,"</td><td>",$score,"</td><td>",$daysLate,"</td><td>";
+		print $myScoreOutput "<tr ",$myStyle,"><td>",$myOpenAccountIndex,"</td><td>",$score,"</td><td>",$daysLate,"</td><td>",$dlWeight,"</td><td>",int($dlWeight*$daysLate),"</td><td>";
 		
-		if ( $lastPaymentDelta > 30 )
+		if ( $lastPaymentDelta >  $PAYMENT_LATE_30_DAYS)
 		{
-			print $myScoreOutput "<font color=red>",$lastPayment,"</font></td><td>",$custname,"</td><td>",$vehicle,"</td><td>",money_format($payoff),"</td><td>";
+			print $myScoreOutput "<font color=red>",$lastPayment,"</font></td><td>",$lpWeight,"</td><td>",$lastPaymentDelta,"</td><td>",($lastPaymentDelta*$lpWeight),"</td><td>",$custname,"</td><td>",$vehicle,"</td><td>",money_format($payoff),"</td><td>",$poWeight,"</td><td>",int($payoff*$poWeight),"</td><td>";
 		}
 		else
 		{
-			print $myScoreOutput $lastPayment,"</td><td>",$custname,"</td><td>",$vehicle,"</td><td>",money_format($payoff),"</td><td>";
+			print $myScoreOutput $lastPayment,"</td><td>",$lpWeight,"</td><td>",$lastPaymentDelta,"</td><td>",($lastPaymentDelta*$lpWeight),"</td><td>",$custname,"</td><td>",$vehicle,"</td><td>",money_format($payoff),"</td><td>",$poWeight,"</td><td>",int($payoff*$poWeight),"</td><td>";
 		}
-		if ($insDelta > 1 )
+		if ($insDelta > $INS_EXPIRE_10_DAYS_LATE )
 		{
-			print $myScoreOutput "<font color=red>",$insExpire,"</font></td></tr>\n";
+			print $myScoreOutput "<font color=red>",$insExpire,"</font></td><td>",$insWeight,"</td><td>",int($insWeight*$insDelta),"</td></tr>\n";
 		}
 		else
 		{
-			print $myScoreOutput $insExpire,"</td></tr>\n";
+			print $myScoreOutput $insExpire,"</td><td>", $insWeight,"</td><td>",int($insWeight*$insDelta),"</td></tr>\n";
 		}
 		$myOpenAccountIndex++;
 		next;
@@ -808,163 +727,12 @@ print $myScoreOutput "</body></html>\n";
 # END - Print out SCORE SORT
 
 
-################################
-# Print out LAST PAYMENT REPORT
-################################
-
-$myOpenAccountIndex = 1;
-print $myLastPayOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Score</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Expiration</th></tr>\n";
-
-for my $i (0 .. $#CoC)
-{
-	my $daysLate     = $CoC[$i][ACCT_DAYSLATE_INDEX];
-	my $vehicle      = $CoC[$i][ACCT_CAR_INDEX];
-	my $lastPayment  = $CoC[$i][ACCT_LASTPAYMENT_INDEX];
-	my $lastPaymentDelta = $CoC[$i][ACCT_LASTPAYMENT_DELTA_INDEX];	
-	my $custname     = $CoC[$i][ACCT_NAME_INDEX];
-	my $insExpire    = $CoC[$i][ACCT_INSEXPIRE_INDEX];
-	my $insDelta     = $CoC[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
-	my $score        = $CoC[$i][ACCT_SCORE_INDEX];
-	my $state        = $CoC[$i][ACCT_REPO_INDEX];
-	
-	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($daysLate > 0))
-	{
-		print $myLastPayOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$score,"</td><td>",$daysLate,"</td><td>";
-		
-		if ( $lastPaymentDelta > 30 )
-		{
-			print $myLastPayOutput "<font color=red>",$lastPayment,"</font></td><td>",$custname,"</td><td>",$vehicle,"</td><td>";
-		}
-		else
-		{
-			print $myLastPayOutput $lastPayment,"</td><td>",$custname,"</td><td>",$vehicle,"</td><td>";
-		}
-		if ($insDelta > 1 )
-		{
-			print $myLastPayOutput "<font color=red>",$insExpire,"</font></td></tr>\n";
-		}
-		else
-		{
-			print $myLastPayOutput $insExpire,"</td></tr>\n";
-		}
-		$myOpenAccountIndex++;
-		next;
-	}	
-}
-print $myLastPayOutput "</table>\n";
-print $myLastPayOutput "<br><br>\n";
-print $myLastPayOutput "</body></html>\n";
-# END - Print out LAST PAYMENT SORT
-
-################################
-# Print out INSURANCE EXPIRATION
-################################
-
-$myOpenAccountIndex = 1;
-print $myInsOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Score</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Expiration</th></tr>\n";
-	
-for my $i (0 .. $#DoD)
-{
-	my $daysLate     = $DoD[$i][ACCT_DAYSLATE_INDEX];
-	my $vehicle      = uc($DoD[$i][ACCT_CAR_INDEX]);
-	my $lastPayment  = $DoD[$i][ACCT_LASTPAYMENT_INDEX];
-	my $lastPaymentDelta = $DoD[$i][ACCT_LASTPAYMENT_DELTA_INDEX];	
-	my $custname     = $DoD[$i][ACCT_NAME_INDEX];
-	my $insExpire    = $DoD[$i][ACCT_INSEXPIRE_INDEX];
-	my $insDelta     = $DoD[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
-	my $score        = $DoD[$i][ACCT_SCORE_INDEX];	
-	my $state        = $DoD[$i][ACCT_REPO_INDEX];
-	
-	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($insDelta > 0))
-	{
-		print $myInsOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$score,"</td><td>",$daysLate,"</td><td>";
-		
-		if ( $lastPaymentDelta > 30 )
-		{
-			print $myInsOutput "<font color=red>",$lastPayment,"</font></td><td>",$custname,"</td><td>",$vehicle,"</td><td>";
-		}
-		else
-		{
-			print $myInsOutput $lastPayment,"</td><td>",$custname,"</td><td>",$vehicle,"</td><td>";
-		}
-		if ($insDelta > 1 )
-		{
-			print $myInsOutput "<font color=red>",$insExpire,"</font></td></tr>\n";
-		}
-		else
-		{
-			print $myInsOutput $insExpire,"</td></tr>\n";
-		}
-		$myOpenAccountIndex++;
-		next;
-	}	
-}
-print $myInsOutput "</table>\n";
-print $myInsOutput "<br><br>\n";
-print $myInsOutput "</body></html>\n";
-# END - Print out INSURANCE EXPIRATION
-
-
-
-################################
-# Print out PAYMENT DAYS LATE
-################################
-
-$myOpenAccountIndex = 1;
-print $myDaysLateOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Score</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Expiration</th></tr>\n";
-	
-for my $i (0 .. $#EoE)
-{
-	my $daysLate     = $EoE[$i][ACCT_DAYSLATE_INDEX];
-	my $vehicle      = uc($EoE[$i][ACCT_CAR_INDEX]);
-	my $lastPayment  = $EoE[$i][ACCT_LASTPAYMENT_INDEX];
-	my $lastPaymentDelta = $EoE[$i][ACCT_LASTPAYMENT_DELTA_INDEX];	
-	my $custname     = $EoE[$i][ACCT_NAME_INDEX];
-	my $insExpire    = $EoE[$i][ACCT_INSEXPIRE_INDEX];
-	my $insDelta     = $EoE[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
-	my $score        = $EoE[$i][ACCT_SCORE_INDEX];
-	my $state        = $EoE[$i][ACCT_REPO_INDEX];
-	
-	if (($state ne $REPOSSESSED) && ($state ne $INPROCESSOFREPO) && ($state ne $ONHOLD) && ($daysLate > 0))
-	{
-		print $myDaysLateOutput "<tr><td>",$myOpenAccountIndex,"</td><td>",$score,"</td><td>",$daysLate,"</td><td>";
-		
-		if ( $daysLate > 30 )
-		{
-			print $myDaysLateOutput "<font color=red>",$lastPayment,"</font></td><td>",$custname,"</td><td>",$vehicle,"</td><td>";
-		}
-		else
-		{
-			print $myDaysLateOutput $lastPayment,"</td><td>",$custname,"</td><td>",$vehicle,"</td><td>";
-		}
-		if ($insDelta > 1 )
-		{
-			print $myDaysLateOutput "<font color=red>",$insExpire,"</font></td></tr>\n";
-		}
-		else
-		{
-			print $myDaysLateOutput $insExpire,"</td></tr>\n";
-		}
-		$myOpenAccountIndex++;
-		next;
-	}	
-}
-print $myDaysLateOutput "</table>\n";
-print $myDaysLateOutput "<br><br>\n";
-print $myDaysLateOutput "</body></html>\n";
-# END - Print out PAYMENT DAYS LATE
-
-
-
-################################
-# Print out LATE ACCOUNTS REPORT
-################################
 
 $myOpenAccountIndex = 1;
 $numAccountsSkipped = 0;
 print $myLateComboOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Status</th><th>Days Active</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Exp.</th><th>Payments Due</th><th>Payoff</th><th>Cell Phone</th><th>Home Phone</th><th>Work Phone</th></tr>\n";
 	
-for my $i (reverse 0 .. $#FoF)
+for my $i (reverse 0 .. scalar(@FoF)-1)
 {
 	my $daysLate     = $FoF[$i][ACCT_DAYSLATE_INDEX];
 	my $vehicle      = uc($FoF[$i][ACCT_CAR_INDEX]);
@@ -994,7 +762,7 @@ for my $i (reverse 0 .. $#FoF)
 	{
 		my $myStyle;
 		
-		if (($saleDateDelta <= 90) && ($daysLate >= 15) ) 
+		if (($saleDateDelta <= 90 && $daysLate >= 15) || ($saleDateDelta <= 90 && $insDelta >= 15) ) 
 		{
 			$myStyle = "style=\"background-color: yellow;\"";
 		}
@@ -1038,6 +806,7 @@ print $myLateComboOutput "</body></html>\n";
 
 
 
+
 ################################
 # Print out REPOSSESSIONs
 ################################
@@ -1047,7 +816,7 @@ print $myOverviewOutput "<br>\n";
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7><I>REPOSSESSIONS and ON-HOLD REPORT</I></th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>State</th><th>Name</th><th>Vehicle</th><th>Days Active</th><th>Payoff</th><th>Last Payment</th></tr>\n";
 	
-for my $i (0 .. $#AoA)
+for my $i (0 .. scalar(@AoA)-1)
 {
 	my $saledateDelta = $AoA[$i][ACCT_SALE_DATE_DELTA_INDEX];
 	my $daysLate      = $AoA[$i][ACCT_DAYSLATE_INDEX];
@@ -1073,35 +842,35 @@ print $myOverviewOutput "</body></html>\n";
 
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7>ACCOUNT TOTALS REPORT</th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\"><tr><th>Days Late</th><th>Total</th><th>Percentage</th>\n";
-print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>On-Hold</td><td>",$numAcctsOnHold,"<td>",nearest(.01,($numAcctsOnHold/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>On-Time (< 10)</td><td>",$numAccts0DaysLate+$numAccts1to9DaysLate,"<td>",nearest(.01,(($numAccts0DaysLate+$numAccts1to9DaysLate)/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>1 to 9 </td><td>",$numAccts1to9DaysLate,"<td>",nearest(.01,($numAccts1to9DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>10 to 29 </td><td>",$numAccts10to29DaysLate,"<td>",nearest(.01,($numAccts10to29DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysLate,"<td>",nearest(.01,($numAccts30to44DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>45 to 59</td><td>",$numAccts45to59DaysLate,"<td>",nearest(.01,($numAccts45to59DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>60 to 90</td><td>",$numAccts60to89DaysLate,"<td>",nearest(.01,($numAccts60to89DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>90 to 120</td><td>",$numAccts90to120DaysLate,"<td>",nearest(.01,($numAccts90to120DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>120 to 180</td><td>",$numAccts120to180DaysLate,"<td>",nearest(.01,($numAccts120to180DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>180 to 365</td><td>",$numAccts180to365DaysLate,"<td>",nearest(.01,($numAccts180to365DaysLate/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>365 or greater</td><td>",$numAccts365DaysLateOrGreater,"<td>",nearest(.01,($numAccts365DaysLateOrGreater/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td> Total Open Accounts (minus repos and holds): </td><td>",$totalNumOpenAccounts,"</td></tr>";
-print $myOverviewOutput "<tr><td> Total Open Accounts (with repos and holds): </td><td>",$totalNumOpenAccounts + $numAcctsRepossessed + $numAcctsOnHold,"</td></tr>";
+print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>On-Hold</td><td>",$numAcctsOnHold,"<td>",nearest(.01,($numAcctsOnHold/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>0 (On-Time)</td><td>",$numAccts0DaysLate,"<td>",nearest(.01,(($numAccts0DaysLate)/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>1 to 9 </td><td>",$numAccts1to9DaysLate,"<td>",nearest(.01,($numAccts1to9DaysLate/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>10 to 29 </td><td>",$numAccts10to29DaysLate,"<td>",nearest(.01,($numAccts10to29DaysLate/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysLate,"<td>",nearest(.01,($numAccts30to44DaysLate/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>45 to 59</td><td>",$numAccts45to59DaysLate,"<td>",nearest(.01,($numAccts45to59DaysLate/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>60 to 90</td><td>",$numAccts60to89DaysLate,"<td>",nearest(.01,($numAccts60to89DaysLate/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>90 to 120</td><td>",$numAccts90to120DaysLate,"<td>",nearest(.01,($numAccts90to120DaysLate/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>120 to 180</td><td>",$numAccts120to180DaysLate,"<td>",nearest(.01,($numAccts120to180DaysLate/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>180 to 365</td><td>",$numAccts180to365DaysLate,"<td>",nearest(.01,($numAccts180to365DaysLate/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>365 or greater</td><td>",$numAccts365DaysLateOrGreater,"<td>",nearest(.01,($numAccts365DaysLateOrGreater/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td><b> Total Open Accounts (minus repos and holds): </td><td>",$totalNumOpenAccounts,"</b></td></tr>";
+print $myOverviewOutput "<tr><td><b> Total Open Accounts (with repos and holds): </td><td>",$totalNumOpenAccounts + $numAcctsRepossessed + $numAcctsOnHold,"</b></td></tr>";
 print $myOverviewOutput "</table>";
 
 print $myOverviewOutput "<br><br>\n";
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7>ACCOUNT LAST PAYMENT TOTALS REPORT</th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\"><tr><th>Days Since Last Payment</th><th>Total</th><th>Percentage</th>\n";
-print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>On-Hold</td><td>",$numAcctsOnHold,"<td>",nearest(.01,($numAcctsOnHold/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>Less than 30</td><td>",$numAccts0to30DaysSinceLastPayments,"<td>",nearest(.01,($numAccts0to30DaysSinceLastPayments/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysSinceLastPayment,"<td>",nearest(.01,($numAccts30to44DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>45 to 59</td><td>",$numAccts45to59DaysSinceLastPayment,"<td>",nearest(.01,($numAccts45to59DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>60 to 90</td><td>",$numAccts60to89DaysSinceLastPayment,"<td>",nearest(.01,($numAccts60to89DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>90 to 120</td><td>",$numAccts90to120DaysSinceLastPayment,"<td>",nearest(.01,($numAccts90to120DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>120 to 180</td><td>",$numAccts120to180DaysSinceLastPayment,"<td>",nearest(.01,($numAccts120to180DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>180 to 365</td><td>",$numAccts180to365DaysSinceLastPayment,"<td>",nearest(.01,($numAccts180to365DaysSinceLastPayment/$#AoA)*100),"</td></tr>";
-print $myOverviewOutput "<tr><td>365 or greater</td><td>",$numAccts365DaysLateOrGreaterSinceLastPayment,"<td>",nearest(.01,($numAccts365DaysLateOrGreaterSinceLastPayment/$#AoA)*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>Repossessed</td><td>",$numAcctsRepossessed,"<td>",nearest(.01,($numAcctsRepossessed/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>On-Hold</td><td>",$numAcctsOnHold,"<td>",nearest(.01,($numAcctsOnHold/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>Less than 30</td><td>",$numAccts0to30DaysSinceLastPayments,"<td>",nearest(.01,($numAccts0to30DaysSinceLastPayments/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>30 to 44</td><td>",$numAccts30to44DaysSinceLastPayment,"<td>",nearest(.01,($numAccts30to44DaysSinceLastPayment/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>45 to 59</td><td>",$numAccts45to59DaysSinceLastPayment,"<td>",nearest(.01,($numAccts45to59DaysSinceLastPayment/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>60 to 90</td><td>",$numAccts60to89DaysSinceLastPayment,"<td>",nearest(.01,($numAccts60to89DaysSinceLastPayment/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>90 to 120</td><td>",$numAccts90to120DaysSinceLastPayment,"<td>",nearest(.01,($numAccts90to120DaysSinceLastPayment/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>120 to 180</td><td>",$numAccts120to180DaysSinceLastPayment,"<td>",nearest(.01,($numAccts120to180DaysSinceLastPayment/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>180 to 365</td><td>",$numAccts180to365DaysSinceLastPayment,"<td>",nearest(.01,($numAccts180to365DaysSinceLastPayment/scalar(@AoA))*100),"</td></tr>";
+print $myOverviewOutput "<tr><td>365 or greater</td><td>",$numAccts365DaysLateOrGreaterSinceLastPayment,"<td>",nearest(.01,($numAccts365DaysLateOrGreaterSinceLastPayment/scalar(@AoA))*100),"</td></tr>";
 print $myOverviewOutput "</table>";
 
 print $myOverviewOutput "<head>\n";
@@ -1147,11 +916,8 @@ print $myOverviewOutput "<br><br>";
 print $myOverviewOutput "</html>\n";
 
 close(HTML_OUTPUT_FILE_SCORE);
-close(HTML_OUTPUT_FILE_LASTPAYMENT);
-close(HTML_OUTPUT_FILE_INSURANCE);
 close(HTML_OUTPUT_FILE_OVERVIEW);
 close(HTML_OUTPUT_FILE_COMBO_LATE);
-close(HTML_OUTPUT_FILE_DAYSLATE);
 
 sub money_format {
   my $number = sprintf "%.2f", shift @_;
