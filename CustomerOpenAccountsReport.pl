@@ -43,11 +43,13 @@ my $timeend;
 	ACCT_WORK_PHONE_INDEX => 14,
 	ACCT_TOTAL_DUE_INDEX => 15,
 	ACCT_PAYMENTS_DUE_INDEX => 16,
-	INS_WEIGHT => 17,
-	LP_WEIGHT => 18,
-	DL_WEIGHT => 19,
-	PO_WEIGHT => 20,
-	MAX_INDEX_VALUE => 21
+	ACCT_DOWNPAYMENT_INDEX => 17,
+	ACCT_SALEPRICE_INDEX => 18,
+	INS_WEIGHT => 19,
+	LP_WEIGHT => 20,
+	DL_WEIGHT => 21,
+	PO_WEIGHT => 22,
+	MAX_INDEX_VALUE => 23
 };
 
 # Get current date/time
@@ -140,8 +142,8 @@ if (open(NEW_AM_INPUT_FILE,$filename) == 0) {
 while (<AM_INPUT_FILE>) 
 {
 	chomp;
-	($autoyear,$automake,$automodel,$lastname,$firstname,$lastpaymentdate,$vin,$totaldue,$dealdate,$payoff,$monthlypayment,$amtfinanced,$adjustbalance,$paymentsdue,$repostatus,$cellphone,$homephone,$workphone,$dayslate) = split(",");
-	print NEW_AM_INPUT_FILE $autoyear,",",$vin,",",$totaldue,",",$dealdate,",",$homephone,",",$payoff,",",$monthlypayment,",",$automodel,",",$automake,",",$dayslate,",",$lastpaymentdate,",",$textOk,",",$lastname,",",$firstname,",",$repostatus,",",$cellphone,",",$amtfinanced,",",$adjustbalance,",",$lastpaymentdate,",",$workphone,",",$paymentsdue,"\n";
+	($autoyear,$automake,$automodel,$lastname,$firstname,$lastpaymentdate,$vin,$totaldue,$dealdate,$payoff,$monthlypayment,$amtfinanced,$adjustbalance,$paymentsdue,$repostatus,$cellphone,$homephone,$workphone,$dayslate,$downpayment,$saleprice) = split(",");
+	print NEW_AM_INPUT_FILE $autoyear,",",$vin,",",$totaldue,",",$dealdate,",",$homephone,",",$payoff,",",$monthlypayment,",",$automodel,",",$automake,",",$dayslate,",",$lastpaymentdate,",",$textOk,",",$lastname,",",$firstname,",",$repostatus,",",$cellphone,",",$amtfinanced,",",$adjustbalance,",",$lastpaymentdate,",",$workphone,",",$paymentsdue,",",$downpayment,",",$saleprice,"\n";
 };
 NEW_AM_INPUT_FILE->flush();
 close(AM_INPUT_FILE); 
@@ -183,15 +185,18 @@ print "NewInsuranceExpirationReport.csv opened.\n";
 
 my $pattern='^[0-3]?[0-9]/[0-3]?[0-9]/(?:[0-9]{2})?[0-9]{2}$';  
 	
+print "Looping over NewCompleteAccountsOverview.csv opened.\n";
 
 while (<NEW_AM_INPUT_FILE>) 
 {
 	chomp;
-	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue) = split(",");
+	($autoyear,$vin,$totaldue,$dealdate,$homephone,$payoff,$monthlypayment,$automodel,$automake,$dayslate,$lastpaymentdate,$textOk,$lastname,$firstname,$repostatus,$cellphone,$amtfinanced,$adjustbalance,$lastpaymentdate,$workphone,$paymentsdue,$downpayment,$saleprice) = split(",");
 
+	print "#";
+	
 	if( length ($vin) == 0 )   #Another way to check for EoF: if($lastpaymentdate !~ m/$pattern/)
 	{
-		print "EOF DETECTION: VIN: [",$vin, "] NAME: [",$firstname," ",$lastname,"]\n";
+		print "\nEOF DETECTION: VIN: [",$vin, "] NAME: [",$firstname," ",$lastname,"]\n";
 		next;
 	}	
 	elsif (($repostatus eq $REPOSSESSED) || ($repostatus eq $INPROCESSOFREPO))
@@ -294,7 +299,7 @@ while (<NEW_AM_INPUT_FILE>)
 	$totalPayoffAmount += ($payoff);
 	$totalMontlyPaymentAmount += $monthlypayment;
 	$totalAmountDue += $totaldue;
-	
+		
 	my $saleDate = Time::Piece->strptime($dealdate, "%m/%d/%yy");
 	
 	if ($paymentsdue < 0 )
@@ -314,6 +319,8 @@ while (<NEW_AM_INPUT_FILE>)
 	$AoA[$myOpenAccountIndex][ACCT_WORK_PHONE_INDEX]        = $workphone;
 	$AoA[$myOpenAccountIndex][ACCT_TOTAL_DUE_INDEX]         = $totaldue;
 	$AoA[$myOpenAccountIndex][ACCT_PAYMENTS_DUE_INDEX]      = $paymentsdue;
+	$AoA[$myOpenAccountIndex][ACCT_DOWNPAYMENT_INDEX]		= $downpayment;
+	$AoA[$myOpenAccountIndex][ACCT_SALEPRICE_INDEX]         = $saleprice;
 	
 	#Set Defaults
 	$AoA[$myOpenAccountIndex][ACCT_INSEXPIRE_INDEX] = "ERROR";
@@ -330,7 +337,9 @@ while (<NEW_AM_INPUT_FILE>)
 	
 	$myEndofFile = 0;
 	seek(NEW_AM_INSURANCE_FILE,0,0);
-	
+
+		
+		
 	while (<NEW_AM_INSURANCE_FILE>) 
 	{
 		chomp;
@@ -374,6 +383,7 @@ while (<NEW_AM_INPUT_FILE>)
 				{
 					print "AM_INPUT_FILE VIN: ",$vin, " has bad insurance expiration of: ", $insexpire,"\n";
 				}
+				
 				$insExpDate = Time::Piece->strptime($insexpire, "%m/%d/%yy");	
 				$insExpDelta = ($myToday - $insExpDate)/86400;		
 			}
@@ -382,6 +392,8 @@ while (<NEW_AM_INPUT_FILE>)
 			{
 				print "AM_INPUT_FILE VIN: ",$vin, " has bad insurance expiration of: ", $lastpaymentdate,"\n";
 			}
+			
+		
 			
 			my $lpDate = Time::Piece->strptime($lastpaymentdate, "%m/%d/%yy");	
 			my $lpDelta = ($myToday - $lpDate)/86400;			
@@ -727,22 +739,25 @@ print $myScoreOutput "</body></html>\n";
 # END - Print out SCORE SORT
 
 
-
 $myOpenAccountIndex = 1;
 $numAccountsSkipped = 0;
-print $myLateComboOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Status</th><th>Days Active</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Exp.</th><th>Payments Due</th><th>Payoff</th><th>Cell Phone</th><th>Home Phone</th><th>Work Phone</th></tr>\n";
+print $myLateComboOutput "<table id=\"t01\" sytle=width:100%><tr><th>Index</th><th>Status</th><th>Days Active</th><th>Days Late</th><th>Last Payment</th><th>Name</th><th>Vehicle</th><th>Insurance Exp.</th><th>Payments Due</th><th>Payoff</th><th>Down</th><th>Cell Phone</th><th>Home Phone</th><th>Work Phone</th></tr>\n";
+	
+	
+	
+	
 	
 for my $i (reverse 0 .. scalar(@FoF)-1)
 {
-	my $daysLate     = $FoF[$i][ACCT_DAYSLATE_INDEX];
-	my $vehicle      = uc($FoF[$i][ACCT_CAR_INDEX]);
-	my $lastPayment  = $FoF[$i][ACCT_LASTPAYMENT_INDEX];
+	my $daysLate      = $FoF[$i][ACCT_DAYSLATE_INDEX];
+	my $vehicle       = uc($FoF[$i][ACCT_CAR_INDEX]);
+	my $lastPayment   = $FoF[$i][ACCT_LASTPAYMENT_INDEX];
 	my $lastPaymentDelta = $FoF[$i][ACCT_LASTPAYMENT_DELTA_INDEX];	
-	my $custname     = $FoF[$i][ACCT_NAME_INDEX];
-	my $insExpire    = $FoF[$i][ACCT_INSEXPIRE_INDEX];
-	my $insDelta     = $FoF[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
-	my $score        = $FoF[$i][ACCT_SCORE_INDEX];
-	my $lateCombo    = $FoF[$i][ACCT_LATE_COMBO_INDEX];
+	my $custname      = $FoF[$i][ACCT_NAME_INDEX];
+	my $insExpire     = $FoF[$i][ACCT_INSEXPIRE_INDEX];
+	my $insDelta      = $FoF[$i][ACCT_INSEXPIRE_DELTA_INDEX];	
+	my $score         = $FoF[$i][ACCT_SCORE_INDEX];
+	my $lateCombo     = $FoF[$i][ACCT_LATE_COMBO_INDEX];
 	my $saleDateDelta = $FoF[$i][ACCT_SALE_DATE_DELTA_INDEX];
 	my $homephone     = $FoF[$i][ACCT_HOME_PHONE_INDEX];
 	my $workphone     = $FoF[$i][ACCT_WORK_PHONE_INDEX];
@@ -751,6 +766,8 @@ for my $i (reverse 0 .. scalar(@FoF)-1)
 	my $state         = $FoF[$i][ACCT_REPO_INDEX];
     my $totaldue      = $FoF[$i][ACCT_TOTAL_DUE_INDEX];
 	my $paymentsdue   = $FoF[$i][ACCT_PAYMENTS_DUE_INDEX];
+	my $downpayment   = $FoF[$i][ACCT_DOWNPAYMENT_INDEX];
+	my $saleprice	  = $FoF[$i][ACCT_SALEPRICE_INDEX];
 	
 	if ( $FoF[$i][ACCT_INSEXPIRE_DELTA_INDEX] >= $INSEXP_SKIP )
 	{
@@ -788,6 +805,9 @@ for my $i (reverse 0 .. scalar(@FoF)-1)
 		
 		print $myLateComboOutput "<td>",money_format($paymentsdue),"</td>\n";
 		print $myLateComboOutput "<td>",money_format($payoff),"</td>\n";
+		
+		#print $myLateComboOutput "<td>",sprintf("%d",($downpayment/$saleprice)*100),"%</td>\n";
+		print $myLateComboOutput "<td>","0%</td>\n";
 		print $myLateComboOutput "<td>",$cellphone,"</td>\n";
 		print $myLateComboOutput "<td>",$homephone,"</td>\n";
 		print $myLateComboOutput "<td>",$workphone,"</td></tr>\n";		
@@ -839,6 +859,11 @@ print $myOverviewOutput "</table>\n";
 print $myOverviewOutput "<br><br>\n";
 print $myOverviewOutput "</body></html>\n";
 # END - Print out REPOSSESSIONS
+
+
+
+
+
 
 print $myOverviewOutput "<table id=\"t02\"><tr><th colspan=7>ACCOUNT TOTALS REPORT</th></tr></table>";
 print $myOverviewOutput "<table id=\"t01\"><tr><th>Days Late</th><th>Total</th><th>Percentage</th>\n";
